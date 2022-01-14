@@ -58,6 +58,12 @@ void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
     isDash = false;
     Console.WriteLine(value);    
     Console.ForegroundColor = ConsoleColor.Gray;
+    updateTitle();
+}
+
+void updateTitle()
+{
+    Console.Title = $"{progress}% | elapsed {totalSw.Elapsed.TotalHours:N}h | {oldTitle}";
 }
 
 void FilterOutput(string? output)
@@ -66,8 +72,6 @@ void FilterOutput(string? output)
     {
         return;
     }
-
-    Console.Title = $"{progress}% | elapsed {totalSw.Elapsed.TotalHours:N}h | {oldTitle}";
 
     streamWriter.WriteLine(output);
 
@@ -83,7 +87,7 @@ void FilterOutput(string? output)
     if (_progress != null)
     {
         progress = double.Parse(_progress) * 100;
-        writeLine($"[P{phase}] Progress {progress}%");
+        writeLine($"[P{phase}] Progress {progress:P0}");
         return;
     }
     var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)", output);
@@ -97,7 +101,7 @@ void FilterOutput(string? output)
     if (_tableTime != null)
     {
         var tableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
-        writeLine($"[P{phase}] Table {table} took {tableTime.TotalMinutes:N}");
+        writeLine($"[P{phase}] Table {table} took {tableTime.TotalMinutes:N} min");
         return;
     }
     var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
