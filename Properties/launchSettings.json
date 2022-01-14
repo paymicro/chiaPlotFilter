@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "chiaPlotFilter": {
+      "commandName": "Project",
+      "commandLineArgs": "?"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "chiaPlotFilter", "chiaPlotFilter.csproj", "{75599C3B-7D46-425E-976A-0271901A3FAC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{75599C3B-7D46-425E-976A-0271901A3FAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{75599C3B-7D46-425E-976A-0271901A3FAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75599C3B-7D46-425E-976A-0271901A3FAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{75599C3B-7D46-425E-976A-0271901A3FAC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4E9D1F23-4CAA-4936-A974-87B64C6BED06}
+	EndGlobalSection
+EndGlobal
