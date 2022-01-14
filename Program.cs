@@ -63,7 +63,7 @@ void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
 
 void updateTitle()
 {
-    Console.Title = $"{progress}% | elapsed {totalSw.Elapsed.TotalHours:N}h | {oldTitle}";
+    Console.Title = $"[P{phase}] | {progress}% | total {totalSw.Elapsed.TotalHours:N}h | {oldTitle}";
 }
 
 void FilterOutput(string? output)
@@ -120,8 +120,9 @@ void FilterOutput(string? output)
     }
 
     // any other output is -
-    Console.Write("-");
+    Console.Write("-");    
     isDash = true;
+    updateTitle();
 }
 
 void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
