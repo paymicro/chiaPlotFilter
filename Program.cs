@@ -39,9 +39,9 @@ async Task startJob(string path, string args)
     }
 }
 
-void writeLine(string value)
+void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
 {
-    Console.ForegroundColor = ConsoleColor.Green;
+    Console.ForegroundColor = color;
     if (isDash)
     {
         Console.WriteLine();
@@ -62,15 +62,14 @@ void FilterOutput(string? output)
     if (_phase != null)
     {
         phase = _phase;
-        writeLine($"Phase: {phase}");
-        writeLine($"Time from start: {sw.Elapsed.TotalHours.ToString("N")} hours");
+        writeLine($"-=[ Phase: {phase} ]=-");
         return;
     }
     var _progress = Helper.GetRegexMatch(@"Progress update: (?<res>\d\.\d+)", output);
     if (_progress != null)
     {
         progress = double.Parse(_progress) * 100;
-        writeLine($"Progress {progress}%");
+        writeLine($"[P{phase}] Progress {progress:N}%");
         return;
     }
     var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
@@ -84,7 +83,7 @@ void FilterOutput(string? output)
     var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d{2} QS.*) force_qs: 0", output);
     if (qs != null)
     {
-        writeLine($"[Warning] Need more RAM: {qs}");
+        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Yellow);
         return;
     }
 
@@ -107,13 +106,12 @@ void OnChiaExit(object? sender, EventArgs? e)
 
 void OnExit(object? sender, ConsoleCancelEventArgs? e)
 {
-    Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.WriteLine("Canceling...");
+    writeLine("Canceling...", ConsoleColor.Yellow);
     if (process != null)
     {
-        Console.WriteLine($"Process {process.ProcessName} | id {process.Id} killed.");
+        writeLine($"Process {process.ProcessName} | id {process.Id} killed.", ConsoleColor.Yellow);
         process.Kill();
     }
-    Console.WriteLine($"Total time: {sw.Elapsed.TotalHours:N} hours");
+    writeLine($"Total time: {sw.Elapsed.TotalHours:N} hours");
     Environment.Exit(-1);
 }
