@@ -185,7 +185,7 @@ void FilterOutput(string? output)
     if (_phase != null)
     {
         phase = _phase;
-        writeLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}");
+        writeLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}", ConsoleColor.Yellow);
         bucket = 0;
         phaseSw.Restart();
         return;
