@@ -5,12 +5,16 @@ var app = Helper.GetAppPath(forkName);
 var oldTitle = Console.Title ?? string.Empty;
 var phase = "0";
 var progress = 0d;
+var realProgress = 0d;
 var table = "";
 var phaseTime = new TimeSpan();
 var totalSw = new Stopwatch();
 var phaseSw = new Stopwatch();
 var isDash = false;
 Process? process = null;
+var defaultBgConsoleColor = Console.BackgroundColor;
+var totalBuckets = Helper.GetBuckets();
+var bucket = 0;
 
 var d = Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs"));
 var streamWriter = new StreamWriter(Path.Combine(d.FullName, DateTime.Now.ToString("yyyy-dd-MM_HH_mm_ss") + ".log"));
@@ -18,8 +22,8 @@ streamWriter.AutoFlush = true;
 
 if (app != null)
 {
-    totalSw.Restart();    
-    Console.CancelKeyPress += OnExit;
+    totalSw.Restart();
+    //Console.CancelKeyPress += OnExit;
     await startJob(app, string.Join(" ", Environment.GetCommandLineArgs().Skip(1).ToArray()));
     streamWriter.Flush();
     streamWriter.Close();
@@ -44,6 +48,9 @@ async Task startJob(string path, string args)
         process.Exited += OnChiaExit;
         process.Start();
         process.BeginOutputReadLine();
+
+        AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
+
         await process.WaitForExitAsync();
     }
 }
@@ -51,6 +58,7 @@ async Task startJob(string path, string args)
 void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
 {
     Console.ForegroundColor = color;
+    Console.BackgroundColor = ConsoleColor.Black;
     if (isDash)
     {
         Console.WriteLine();
@@ -58,12 +66,18 @@ void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
     isDash = false;
     Console.WriteLine(value);    
     Console.ForegroundColor = ConsoleColor.Gray;
+    Console.BackgroundColor = defaultBgConsoleColor;
     updateTitle();
 }
 
 void updateTitle()
 {
-    Console.Title = $"[P{phase}] | {progress}% | total {totalSw.Elapsed.TotalHours:N}h | {oldTitle}";
+    var elapsed = $"{totalSw.Elapsed.Hours}h {totalSw.Elapsed.Minutes}m";
+    if (totalSw.Elapsed.Days > 0)
+    {
+        elapsed = $"{totalSw.Elapsed.Days} days, {elapsed}";
+    }
+    Console.Title = $"P{phase} | {realProgress:F2}% | elapsed {elapsed} | {oldTitle}";
 }
 
 void FilterOutput(string? output)
@@ -87,13 +101,14 @@ void FilterOutput(string? output)
     if (_progress != null)
     {
         progress = double.Parse(_progress) * 100;
-        writeLine($"[P{phase}] Progress {progress:P0}");
+        writeLine($"[P{phase}] Progress {progress:F2} % | corrected {realProgress:F2} %");
         return;
     }
-    var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)", output);
+    var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
     if (_table != null)
     {
         table = _table;
+        bucket = 0;
         writeLine($"[P{phase}] Work on table {table}");
         return;
     }
@@ -112,17 +127,85 @@ void FilterOutput(string? output)
         return;
     }
 
-    var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d{2} QS.*) force_qs: 0", output);
+    var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
     if (qs != null)
     {
         writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Yellow);
         return;
     }
 
-    // any other output is -
-    Console.Write("-");    
+    // any bucket output is '-'
     isDash = true;
+    var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
+    if (b != null)
+    {
+        bucket++;
+        Console.Write("-");
+        calcRealProgress();
+    }
+       
     updateTitle();
+}
+
+double bProgress(double from, double to)
+{
+    var b = phase switch
+    {
+        "3" => table switch
+        {
+            "1 and 2" => bucket * 0.51d,
+            "2 and 3" => bucket * 0.50d,
+            "3 and 4" => bucket * 0.44d,
+            "4 and 5" => bucket * 0.44d,
+            "5 and 6" => bucket * 0.43d,
+            "6 and 7" => bucket * 0.406d,
+            _ => bucket * 0.4d,
+        },
+        _ => bucket,
+    };
+    return from + (to - from) * b / totalBuckets;
+}
+
+void calcRealProgress()
+{
+    realProgress = phase switch
+    {
+        "1" => table switch
+        {
+            "1" => bProgress(1, 5),
+            "2" => bProgress(5, 10),
+            "3" => bProgress(10, 15),
+            "4" => bProgress(15, 20),
+            "5" => bProgress(20, 25),
+            "6" => bProgress(25, 30),
+            _ => 30,
+        },
+        "2" => table switch
+        {
+            "7" => bProgress(31, 34),
+            "6" => bProgress(34, 38),
+            "5" => bProgress(38, 41),
+            "4" => bProgress(41, 43),
+            "3" => bProgress(43, 45),
+            "2" => bProgress(45, 50),
+            _ => 50,
+        },
+        "3" => table switch
+        {
+            "1 and 2" => bProgress(50, 57),
+            "2 and 3" => bProgress(57, 65),
+            "3 and 4" => bProgress(65, 73),
+            "4 and 5" => bProgress(73, 82),
+            "5 and 6" => bProgress(82, 91),
+            "6 and 7" => bProgress(91, 97),
+            _ => 97,
+        },
+        "4" => table switch
+        {
+            _ => 98
+        },
+        _ => progress,
+    };
 }
 
 void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
@@ -147,4 +230,9 @@ void OnExit(object? sender, ConsoleCancelEventArgs? e)
     }
     writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");
     Environment.Exit(-1);
+}
+
+void CurrentDomain_ProcessExit(object? sender, EventArgs e)
+{
+    OnExit(sender, null);
 }

@@ -13,6 +13,17 @@ internal class Helper
         return "chia";
     }
 
+    public static int GetBuckets()
+    {
+        string[] arguments = Environment.GetCommandLineArgs();
+        var arg = Array.IndexOf(arguments, "-u");
+        if (arg != -1 && arguments.Length > arg && int.TryParse(arguments[arg + 1], out int result))
+        {            
+            return result;
+        }
+        return 128;
+    }
+
     public static string GetAppPath(string forkName)
     {
         var app = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $"{forkName}-blockchain");
