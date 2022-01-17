@@ -73,9 +73,10 @@ void updateTitle()
     var elapsed = $"{totalSw.Elapsed.Hours}h {totalSw.Elapsed.Minutes}m";
     if (totalSw.Elapsed.Days > 0)
     {
-        elapsed = $"{totalSw.Elapsed.Days} days, {elapsed}";
+        elapsed = $"{totalSw.Elapsed.Days}d {elapsed}";
     }
-    Console.Title = $"P{phase} | {realProgress:F2}% | elapsed {elapsed} | {oldTitle}";
+    var eta = totalSw.Elapsed / realProgress;
+    Console.Title = $"P{phase} | {realProgress:F2}% | elapsed {elapsed} | ETA {eta.TotalHours}h | {oldTitle}";
 }
 
 double bProgress(double from, double to)
