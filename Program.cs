@@ -3,7 +3,7 @@
 var forkName = Helper.GetArg("-fork") ?? "chia";
 var app = Helper.GetAppPath(forkName);
 var totalBuckets = int.TryParse(Helper.GetArg("-u"), out int result) ? result : 128;
-var isTest = Helper.GetArg("-test");
+var testArg = Helper.GetArg("-test") ?? "";
 var oldTitle = Console.Title ?? string.Empty;
 var phase = "0";
 var progress = 0d;
@@ -23,16 +23,44 @@ Console.CancelKeyPress += OnConsoleExit;
 if (app != null)
 {
     totalSw.Restart();
-    await startJob(app, string.Join(" ", Environment.GetCommandLineArgs().Skip(1).ToArray()));
-    streamWriter.Flush();
-    streamWriter.Close();
-    streamWriter.Dispose();
+    if (string.IsNullOrEmpty(testArg))
+    {
+        await startJob(app, string.Join(" ", Environment.GetCommandLineArgs().Skip(1).ToArray()));
+    }
+    else
+    {
+        await TestOnLog();
+    }
+
+    streamWriter?.Close();
+    streamWriter?.Dispose();
+
     OnProcessExit(null, null);
+}
+
+async Task TestOnLog()
+{
+    if (!File.Exists(testArg))
+    {
+        Console.WriteLine($"[Error] Test file '{testArg}' not found.");
+        return;
+    }
+
+    using var testReader = new StreamReader(testArg);
+    var line = testReader.ReadLine();
+    while (!string.IsNullOrEmpty(line))
+    {
+        FilterOutput(line);
+        line = testReader.ReadLine();
+        await Task.Delay(20);
+    }
+    return;
 }
 
 async Task startJob(string path, string args)
 {
     writeLine($"Start: {forkName} {args}");
+    
     using (process = new Process())
     {
         process.StartInfo = new ProcessStartInfo(path)
@@ -75,8 +103,8 @@ void updateTitle()
     {
         elapsed = $"{totalSw.Elapsed.Days}d {elapsed}";
     }
-    var eta = totalSw.Elapsed / realProgress;
-    Console.Title = $"P{phase} | {realProgress:F2}% | elapsed {elapsed} | ETA {eta.TotalHours}h | {oldTitle}";
+    var etaString = realProgress > 5 ? $"ETA {(totalSw.Elapsed / realProgress).TotalHours:F2}h" : "";
+    Console.Title = string.Join(" | ", new[] { $"P{phase}", $"{realProgress:F2}%", $"elapsed {elapsed}", etaString, oldTitle }.Where(s => !string.IsNullOrEmpty(s)));
 }
 
 double bProgress(double from, double to)
@@ -104,12 +132,13 @@ void calcRealProgress()
     {
         "1" => table switch
         {
-            "1" => bProgress(1, 5),
-            "2" => bProgress(5, 10),
-            "3" => bProgress(10, 15),
-            "4" => bProgress(15, 20),
-            "5" => bProgress(20, 25),
-            "6" => bProgress(25, 30),
+            "1" => bProgress(1, 4.5),
+            "2" => bProgress(4.5, 9),
+            "3" => bProgress(9, 13),
+            "4" => bProgress(13, 17),
+            "5" => bProgress(17, 22),
+            "6" => bProgress(22, 24),
+            "7" => bProgress(24, 30),
             _ => 30,
         },
         "2" => table switch
@@ -129,12 +158,12 @@ void calcRealProgress()
             "3 and 4" => bProgress(65, 73),
             "4 and 5" => bProgress(73, 82),
             "5 and 6" => bProgress(82, 91),
-            "6 and 7" => bProgress(91, 97),
-            _ => 97,
+            "6 and 7" => bProgress(91, 96.5),
+            _ => 96.5,
         },
         "4" => table switch
         {
-            _ => 98
+            _ => bProgress(96.5, 100),
         },
         _ => progress,
     };
@@ -157,6 +186,7 @@ void FilterOutput(string? output)
     {
         phase = _phase;
         writeLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}");
+        bucket = 0;
         phaseSw.Restart();
         return;
     }
@@ -196,11 +226,11 @@ void FilterOutput(string? output)
         return;
     }
 
-    // any bucket output is '-'
-    isDash = true;
+    // any bucket output is '-'    
     var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
     if (b != null)
     {
+        isDash = true;
         bucket++;
         Console.Write("-");
     }

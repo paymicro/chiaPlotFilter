@@ -2,7 +2,7 @@
   "profiles": {
     "chiaPlotFilter": {
       "commandName": "Project",
-      "commandLineArgs": "?"
+      "commandLineArgs": "-test 2022-17-01_05_39_25.log"
     }
   }
 }
