@@ -18,6 +18,7 @@ var defaultBgConsoleColor = Console.BackgroundColor;
 var bucket = 0;
 var d = Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs"));
 var streamWriter = new StreamWriter(Path.Combine(d.FullName, DateTime.Now.ToString("yyyy-dd-MM_HH_mm_ss") + ".log"));
+Console.CancelKeyPress += OnConsoleExit;
 
 if (app != null)
 {
@@ -211,12 +212,12 @@ void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
 
 void OnProcessExit(object? sender, EventArgs? e)
 {
-    writeLine("Plotter has ended.");
+    writeLine("Plotter has ended.", ConsoleColor.Yellow);
     writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");
     Environment.Exit(0);
 }
 
-void OnExit(object? sender, ConsoleCancelEventArgs? e)
+void OnConsoleExit(object? sender, ConsoleCancelEventArgs? e)
 {
     writeLine("Canceling...", ConsoleColor.Yellow);
     if (process != null)
@@ -225,10 +226,10 @@ void OnExit(object? sender, ConsoleCancelEventArgs? e)
         process.Kill();
     }
     writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");
-    Environment.Exit(-1);
+    Environment.Exit(0);
 }
 
 void CurrentDomain_ProcessExit(object? sender, EventArgs e)
 {
-    OnExit(sender, null);
+    OnConsoleExit(sender, null);
 }
