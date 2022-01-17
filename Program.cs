@@ -1,7 +1,9 @@
 ﻿using System.Diagnostics;
 
-var forkName = Helper.GetFork();
+var forkName = Helper.GetArg("-fork") ?? "chia";
 var app = Helper.GetAppPath(forkName);
+var totalBuckets = int.TryParse(Helper.GetArg("-u"), out int result) ? result : 128;
+var isTest = Helper.GetArg("-test");
 var oldTitle = Console.Title ?? string.Empty;
 var phase = "0";
 var progress = 0d;
@@ -13,24 +15,19 @@ var phaseSw = new Stopwatch();
 var isDash = false;
 Process? process = null;
 var defaultBgConsoleColor = Console.BackgroundColor;
-var totalBuckets = Helper.GetBuckets();
 var bucket = 0;
-
 var d = Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs"));
 var streamWriter = new StreamWriter(Path.Combine(d.FullName, DateTime.Now.ToString("yyyy-dd-MM_HH_mm_ss") + ".log"));
-streamWriter.AutoFlush = true;
 
 if (app != null)
 {
     totalSw.Restart();
-    //Console.CancelKeyPress += OnExit;
     await startJob(app, string.Join(" ", Environment.GetCommandLineArgs().Skip(1).ToArray()));
     streamWriter.Flush();
     streamWriter.Close();
     streamWriter.Dispose();
-    OnChiaExit(null, null);
+    OnProcessExit(null, null);
 }
-
 
 async Task startJob(string path, string args)
 {
@@ -45,7 +42,7 @@ async Task startJob(string path, string args)
             RedirectStandardInput = true,
         };
         process.OutputDataReceived += OutputDataReceived;
-        process.Exited += OnChiaExit;
+        process.Exited += OnProcessExit;
         process.Start();
         process.BeginOutputReadLine();
 
@@ -78,73 +75,6 @@ void updateTitle()
         elapsed = $"{totalSw.Elapsed.Days} days, {elapsed}";
     }
     Console.Title = $"P{phase} | {realProgress:F2}% | elapsed {elapsed} | {oldTitle}";
-}
-
-void FilterOutput(string? output)
-{
-    if (string.IsNullOrWhiteSpace(output))
-    {
-        return;
-    }
-
-    streamWriter.WriteLine(output);
-
-    var _phase = Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output);
-    if (_phase != null)
-    {
-        phase = _phase;
-        writeLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}");
-        phaseSw.Restart();
-        return;
-    }
-    var _progress = Helper.GetRegexMatch(@"Progress update: (?<res>\d\.\d+)", output);
-    if (_progress != null)
-    {
-        progress = double.Parse(_progress) * 100;
-        writeLine($"[P{phase}] Progress {progress:F2} % | corrected {realProgress:F2} %");
-        return;
-    }
-    var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
-    if (_table != null)
-    {
-        table = _table;
-        bucket = 0;
-        writeLine($"[P{phase}] Work on table {table}");
-        return;
-    }
-    var _tableTime = Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output);
-    if (_tableTime != null)
-    {
-        var tableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
-        writeLine($"[P{phase}] Table {table} took {tableTime.TotalMinutes:N} min");
-        return;
-    }
-    var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
-    if (_phaseTime != null)
-    {
-        phaseTime = TimeSpan.FromSeconds(double.Parse(_phaseTime));
-        writeLine($"Phase {phase} took {phaseTime.TotalMinutes:N} minutes");
-        return;
-    }
-
-    var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
-    if (qs != null)
-    {
-        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Yellow);
-        return;
-    }
-
-    // any bucket output is '-'
-    isDash = true;
-    var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
-    if (b != null)
-    {
-        bucket++;
-        Console.Write("-");
-        calcRealProgress();
-    }
-       
-    updateTitle();
 }
 
 double bProgress(double from, double to)
@@ -208,12 +138,78 @@ void calcRealProgress()
     };
 }
 
+void FilterOutput(string? output)
+{
+    if (string.IsNullOrWhiteSpace(output))
+    {
+        return;
+    }
+
+    streamWriter.WriteLine(output);
+    streamWriter.Flush();
+    calcRealProgress();
+    updateTitle();
+
+    var _phase = Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output);
+    if (_phase != null)
+    {
+        phase = _phase;
+        writeLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}");
+        phaseSw.Restart();
+        return;
+    }
+    var _progress = Helper.GetRegexMatch(@"Progress update: (?<res>\d\.\d+)", output);
+    if (_progress != null)
+    {
+        progress = double.Parse(_progress) * 100;
+        writeLine($"[P{phase}] Progress {progress:F2} % | corrected {realProgress:F2} %");
+        return;
+    }
+    var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
+    if (_table != null)
+    {
+        table = _table;
+        bucket = 0;
+        writeLine($"[P{phase}] Work on table {table}");
+        return;
+    }
+    var _tableTime = Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output);
+    if (_tableTime != null)
+    {
+        var tableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
+        writeLine($"[P{phase}] Table {table} took {tableTime.TotalMinutes:N} min");
+        return;
+    }
+    var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
+    if (_phaseTime != null)
+    {
+        phaseTime = TimeSpan.FromSeconds(double.Parse(_phaseTime));
+        writeLine($"Phase {phase} took {phaseTime.TotalMinutes:N} minutes");
+        return;
+    }
+    var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
+    if (qs != null)
+    {
+        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Yellow);
+        return;
+    }
+
+    // any bucket output is '-'
+    isDash = true;
+    var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
+    if (b != null)
+    {
+        bucket++;
+        Console.Write("-");
+    }
+}
+
 void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
 {
     FilterOutput(e?.Data);
 }
 
-void OnChiaExit(object? sender, EventArgs? e)
+void OnProcessExit(object? sender, EventArgs? e)
 {
     writeLine("Plotter has ended.");
     writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");

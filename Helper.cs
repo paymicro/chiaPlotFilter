@@ -2,26 +2,15 @@
 
 internal class Helper
 {
-    public static string GetFork()
+    public static string? GetArg(string arg)
     {
         string[] arguments = Environment.GetCommandLineArgs();
-        var forkArgI = Array.IndexOf(arguments, "-fork");
+        var forkArgI = Array.IndexOf(arguments, arg);
         if (forkArgI != -1 && arguments.Length > forkArgI)
         {
             return arguments[forkArgI + 1];
         }
-        return "chia";
-    }
-
-    public static int GetBuckets()
-    {
-        string[] arguments = Environment.GetCommandLineArgs();
-        var arg = Array.IndexOf(arguments, "-u");
-        if (arg != -1 && arguments.Length > arg && int.TryParse(arguments[arg + 1], out int result))
-        {            
-            return result;
-        }
-        return 128;
+        return null;
     }
 
     public static string GetAppPath(string forkName)
