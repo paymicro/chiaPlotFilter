@@ -1,29 +1,32 @@
-﻿using System.Diagnostics;
+﻿using System.ComponentModel;
+using System.Diagnostics;
 
 var forkName = Helper.GetArg("-fork") ?? "chia";
 var app = Helper.GetAppPath(forkName);
-var totalBuckets = int.TryParse(Helper.GetArg("-u"), out int result) ? result : 128;
 var testArg = Helper.GetArg("-test") ?? string.Empty;
 var oldTitle = Console.Title ?? string.Empty;
-var phase = "0";
-var progress = 0d;
-var realProgress = 0d;
-var table = "";
-var phaseTime = new TimeSpan();
-var totalSw = new Stopwatch();
-var tableSw = new Stopwatch();
-var isDash = false;
+var phaseTitleTop = 0;
 Process? process = null;
 var defaultBgConsoleColor = Console.BackgroundColor;
-var bucket = 0;
 var d = Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs"));
-var streamWriter = new StreamWriter(Path.Combine(d.FullName, DateTime.Now.ToString("yyyy-dd-MM_HH_mm_ss") + ".log"));
-Console.CancelKeyPress += OnConsoleExit;
-var lastLineLen = 35;
+var pathToLog = Path.Combine(d.FullName, DateTime.Now.ToString("yyyy-dd-MM_HH_mm_ss") + ".log");
+var streamWriter = new StreamWriter(pathToLog);
+var firstCol = 45;
+var titleFormat = 0;
+
+var data = new PlotData
+{
+    TotalBuckets = int.TryParse(Helper.GetArg("-u"), out int result) ? result : 128
+};
 
 if (app != null)
 {
-    totalSw.Restart();
+    data.PropertyChanged += OnProperyChanged;
+    Console.CancelKeyPress += OnConsoleExit;
+
+    _ = KeyPresses();
+    AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
+
     if (string.IsNullOrEmpty(testArg))
     {
         await startJob(app, string.Join(" ", Environment.GetCommandLineArgs().Skip(1).ToArray()));
@@ -37,6 +40,61 @@ if (app != null)
     streamWriter.Dispose();
 
     OnProcessExit(null, null);
+}
+
+void OnProperyChanged(object? sender, PropertyChangedEventArgs e)
+{
+    updateTitle();
+    switch (e.PropertyName)
+    {
+        case nameof(PlotData.Phase):
+            writeLine($"-=[ Phase: {data.Phase} ]=-         started at {DateTime.Now:HH:mm:ss}", ConsoleColor.Yellow);
+            break;
+        case nameof(PlotData.Bucket):
+            var tableStr = data.Phase != 4 ? $" Table {data.Table}" : string.Empty;
+            rewriteLine($"[P{data.Phase}]{tableStr}. Bucket: {data.Bucket:D3} | {data.RealProgress:F2}%", ConsoleColor.Gray);
+            break;
+        case nameof(PlotData.Table):
+            switch (data.Phase)
+            {
+                case 1:
+                    switch (data.Table)
+                    {
+                        case "1":
+                            rewriteLine($"[P{data.Phase}] Table {data.Table}. | {data.RealProgress:F2}%", ConsoleColor.Gray);
+                            break;
+                        case "2":
+                            appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min");
+                            break;
+                    }
+                    break;
+                case 2:
+                    switch (data.Table)
+                    {
+                        case "7": break;
+                        default: appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min"); break;
+                    }
+                    rewriteLine($"[P{data.Phase}] Work on table {data.Table} | {data.RealProgress:F2}%", ConsoleColor.Gray);
+                    break;
+            }
+            phaseTitleTop = Console.CursorTop;
+            break;
+        case nameof(PlotData.PhaseTime):
+            switch (data.Phase)
+            {
+                case 2:
+                    appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min");
+                    break;
+                case 4:
+                    Console.WriteLine();
+                    break;
+            }
+            writeLine($"Phase {data.Phase} took {data.PhaseTime.TotalMinutes:N} minutes");
+            break;
+        case nameof(PlotData.TableTime):
+            appendLine($" took {data.TableTime.TotalMinutes:N} min");
+            break;
+    }
 }
 
 async Task TestOnLog()
@@ -55,7 +113,7 @@ async Task TestOnLog()
     {
         FilterOutput(line);
         line = testReader.ReadLine();
-        await Task.Delay(20);
+        await Task.Delay(200);
     }
     return;
 }
@@ -78,23 +136,51 @@ async Task startJob(string path, string args)
         process.Start();
         process.BeginOutputReadLine();
 
-        AppDomain.CurrentDomain.ProcessExit += new EventHandler(CurrentDomain_ProcessExit);
-
         await process.WaitForExitAsync();
     }
 }
 
-void writeLine(string value, ConsoleColor color = ConsoleColor.Green)
+async Task KeyPresses()
+{
+    while (true)
+    {
+        await Task.Delay(100);
+        if (Console.KeyAvailable)
+        {
+            var key = Console.ReadKey(true);
+            switch (key.Key)
+            {
+                case ConsoleKey.U:
+                    titleFormat++;
+                    if (titleFormat > 3)
+                    {
+                        titleFormat = 0;
+                    }
+                    break;
+                case ConsoleKey.H:
+                    rewriteLine("H presed");
+                    break;
+                case ConsoleKey.Q:
+                    rewriteLine("For exit press Ctrl-C or close dialog");
+                    break;
+                case ConsoleKey.L:
+                    Process.Start("explorer.exe", pathToLog);
+                    break;
+            }
+        }
+        updateTitle();
+    }
+}
+
+void writeLine(string value, ConsoleColor color = ConsoleColor.Green, int left = -1)
 {
     Console.ForegroundColor = color;
     Console.BackgroundColor = ConsoleColor.Black;
-    if (isDash)
+    if (left > 0)
     {
-        Console.WriteLine();
+        Console.SetCursorPosition(left, Console.GetCursorPosition().Top);
     }
-    isDash = false;
-    lastLineLen = 35;
-    Console.WriteLine(value);    
+    Console.WriteLine(value);
     Console.ForegroundColor = ConsoleColor.Gray;
     Console.BackgroundColor = defaultBgConsoleColor;
     updateTitle();
@@ -109,10 +195,10 @@ void rewriteLine(string value, ConsoleColor color = ConsoleColor.Gray)
 
     Console.ForegroundColor = color;
     Console.BackgroundColor = ConsoleColor.Black;
-    var postLen = lastLineLen - value.Length;
+    var postLen = firstCol - value.Length;
     var postfix = postLen > 0 ? new string(' ', postLen) : String.Empty;
-    Console.Write($"\r{value}{postfix}");    
-    lastLineLen = Math.Max(value.Length, lastLineLen);
+    Console.Write($"\r{value}{postfix}");
+    Console.Write('\r');
     Console.ForegroundColor = ConsoleColor.Gray;
     Console.BackgroundColor = defaultBgConsoleColor;
 }
@@ -126,84 +212,47 @@ void appendLine(string value, ConsoleColor color = ConsoleColor.Green)
 
     Console.ForegroundColor = color;
     Console.BackgroundColor = ConsoleColor.Black;
+    Console.SetCursorPosition(firstCol, Console.CursorTop);
     Console.Write(value);
     Console.WriteLine();
-    lastLineLen = Math.Max(value.Length, lastLineLen);
     Console.ForegroundColor = ConsoleColor.Gray;
     Console.BackgroundColor = defaultBgConsoleColor;
 }
 
 void updateTitle()
 {
-    var elapsed = $"{totalSw.Elapsed.Hours}h {totalSw.Elapsed.Minutes}m";
-    if (totalSw.Elapsed.Days > 0)
+    switch (titleFormat)
     {
-        elapsed = $"{totalSw.Elapsed.Days}d {elapsed}";
+        default:
+            Console.Title = string.Join(" | ",
+                new[] {
+                    $"P{data.Phase}",
+                    $"{data.RealProgress:F2}%",
+                    data.GetElapsed(),
+                    data.GetRemain(),
+                    oldTitle,
+                }.Where(s => !string.IsNullOrEmpty(s)));
+            break;
+        case 1:
+            Console.Title = string.Join(" | ",
+                new[] {
+                    $"P{data.Phase}",
+                    $"{data.RealProgress:F2}%",
+                    data.GetElapsed(),
+                    data.GetRemain(),
+                }.Where(s => !string.IsNullOrEmpty(s)));
+            break;
+        case 2:
+            Console.Title = oldTitle;
+            break;
+        case 3:
+            Console.Title = string.Join(" | ",
+                new[] { $"{data.RealProgress:F2}%",
+                    data.GetTotal(),
+                    data.GetETA()
+                }.Where(s => !string.IsNullOrEmpty(s))); ;
+            break;
     }
-    var etaString = realProgress > 5 ? $"ETA {(totalSw.Elapsed * 100 / realProgress).TotalHours:F2}h" : "";
-    Console.Title = string.Join(" | ", new[] { $"P{phase}", $"{realProgress:F2}%", $"elapsed {elapsed}", etaString, oldTitle }.Where(s => !string.IsNullOrEmpty(s)));
-}
-
-double bProgress(double from, double to)
-{
-    var b = phase switch
-    {
-        "3" => table switch
-        {
-            "1 and 2" => bucket * 0.51d,
-            "2 and 3" => bucket * 0.50d,
-            "3 and 4" => bucket * 0.44d,
-            "4 and 5" => bucket * 0.44d,
-            "5 and 6" => bucket * 0.43d,
-            "6 and 7" => bucket * 0.406d,
-            _ => bucket * 0.4d,
-        },
-        _ => bucket,
-    };
-    return from + (to - from) * b / totalBuckets;
-}
-
-void calcRealProgress()
-{
-    realProgress = phase switch
-    {
-        "1" => table switch
-        {
-            "1" => bProgress(1, 4),
-            "2" => bProgress(4, 8),
-            "3" => bProgress(8, 12),
-            "4" => bProgress(12, 16),
-            "5" => bProgress(16, 21),
-            "6" => bProgress(21, 23),
-            "7" => bProgress(23, 29),
-            _ => 30,
-        },
-        "2" => table switch
-        {
-            "7" => 32,
-            "6" => 36,
-            "5" => 39,
-            "4" => 41,
-            "3" => 45,
-            "2" => 48,
-            _ => 50,
-        },
-        "3" => table switch
-        {
-            "1 and 2" => bProgress(50, 57),
-            "2 and 3" => bProgress(57, 65),
-            "3 and 4" => bProgress(65, 73),
-            "4 and 5" => bProgress(73, 82),
-            "5 and 6" => bProgress(82, 91),
-            "6 and 7" => bProgress(91, 96.5),
-            _ => 96.5,
-        },
-        "4" => table switch
-        {
-            _ => bProgress(96.5, 100),
-        },
-        _ => progress,
-    };
 }
 
 void FilterOutput(string? output)
@@ -223,94 +272,41 @@ void FilterOutput(string? output)
         // ignored
     }
 
-    updateTitle();
-
     var _phase = Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output);
     if (_phase != null)
     {
-        phase = _phase;
-        appendLine($"-=[ Phase: {phase} ]=-         started at {DateTime.Now:HH:mm:ss}", ConsoleColor.Yellow);
-        bucket = 0;
-        return;
-    }
-    var _progress = Helper.GetRegexMatch(@"Progress update: (?<res>\d\.\d+)", output);
-    if (_progress != null)
-    {
-        progress = double.Parse(_progress) * 100;
+        data.Phase = int.TryParse(_phase, out result) ? result : 0;        
         return;
     }
     var _table = Helper.GetRegexMatch(@"", output);
     _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
     if (_table != null)
     {
-        table = _table;
-        bucket = 0;
-        calcRealProgress();
-
-        switch (phase)
-        {
-            case "1":
-                if (table == "1")
-                {
-                    rewriteLine($"[P{phase}] Table {table}. | {realProgress:F2}%", ConsoleColor.Gray);
-                }
-                else if (table == "2")
-                {
-                    appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
-                }
-                break;
-            case "2":
-                if (table != "7")
-                {
-                    appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
-                }
-                rewriteLine($"[P{phase}] Work on table {table} | {realProgress:F2}%", ConsoleColor.Gray);
-                break;
-        }
-
-        tableSw.Restart();
+        data.Table = _table;
         return;
     }
     var _tableTime = Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output);
     if (_tableTime != null)
     {
-        var tableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
-        appendLine($" took {tableTime.TotalMinutes:N} min");
+        data.TableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
         return;
     }
     var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
     if (_phaseTime != null)
     {
-        if (phase == "2")
-        {
-            appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
-        }
-        phaseTime = TimeSpan.FromSeconds(double.Parse(_phaseTime));
-        var text = $"Phase {phase} took {phaseTime.TotalMinutes:N} minutes";
-        if (phase != "4")
-        {
-            appendLine(text);
-        }
-        else
-        {
-            writeLine(text);
-        }
+        data.PhaseTime = TimeSpan.FromSeconds(double.Parse(_phaseTime));
         return;
     }
     var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
     if (qs != null)
     {
-        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Red);
+        writeLine($"[P{data.Phase}] Warning: need more RAM: {qs}", ConsoleColor.Red);
         return;
     }
     var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
     if (b != null)
     {
-        isDash = true;
-        bucket++;
-        var tableStr = phase != "4" ? $" Table {table}" : string.Empty;
-        calcRealProgress();
-        rewriteLine($"[P{phase}]{tableStr}. Bucket: {b} | {realProgress:F2}%", ConsoleColor.Gray);
+        data.Bucket++;
     }
 }
 
@@ -322,7 +318,7 @@ void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
 void OnProcessExit(object? sender, EventArgs? e)
 {
     writeLine("Plotter has ended.", ConsoleColor.Yellow);
-    writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");
+    writeLine($"Plot time: {data.plotSw.Elapsed.TotalHours:N} hours");
     Environment.Exit(0);
 }
 
@@ -331,10 +327,16 @@ void OnConsoleExit(object? sender, ConsoleCancelEventArgs? e)
     writeLine("Canceling...", ConsoleColor.Yellow);
     if (process != null)
     {
-        writeLine($"Process {process.ProcessName} | id {process.Id} killed.", ConsoleColor.Yellow);
-        process.Kill();
+        Console.WriteLine("---------------------------------------------");
+        Console.WriteLine($"Kill process {process.ProcessName}? (Y/n)");
+        var q = Console.ReadLine();
+        if (q.ToLowerInvariant().FirstOrDefault() == 'y')
+        {
+            writeLine($"Process {process.ProcessName} | id {process.Id} killed.", ConsoleColor.Yellow);
+            process.Kill();
+        }
     }
-    writeLine($"Total time: {totalSw.Elapsed.TotalHours:N} hours");
+    writeLine($"Plot time: {data.plotSw.Elapsed.TotalHours:N} hours");
     Environment.Exit(0);
 }
 
