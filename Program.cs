@@ -169,13 +169,13 @@ void calcRealProgress()
     {
         "1" => table switch
         {
-            "1" => bProgress(1, 4.5),
-            "2" => bProgress(4.5, 9),
-            "3" => bProgress(9, 13),
-            "4" => bProgress(13, 17),
-            "5" => bProgress(17, 22),
-            "6" => bProgress(22, 24),
-            "7" => bProgress(24, 30),
+            "1" => bProgress(1, 4),
+            "2" => bProgress(4, 8),
+            "3" => bProgress(8, 12),
+            "4" => bProgress(12, 16),
+            "5" => bProgress(16, 21),
+            "6" => bProgress(21, 23),
+            "7" => bProgress(23, 29),
             _ => 30,
         },
         "2" => table switch
@@ -223,7 +223,6 @@ void FilterOutput(string? output)
         // ignored
     }
 
-    calcRealProgress();
     updateTitle();
 
     var _phase = Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output);
@@ -240,23 +239,35 @@ void FilterOutput(string? output)
         progress = double.Parse(_progress) * 100;
         return;
     }
-    var _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)", output);
+    var _table = Helper.GetRegexMatch(@"", output);
+    _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
     if (_table != null)
     {
         table = _table;
         bucket = 0;
-        return;
-    }
-    _table = Helper.GetRegexMatch(@"^Backpropagating on table (?<res>\d+)", output);
-    if (_table != null)
-    {
-        table = _table;
-        if (tableSw.IsRunning)
-        {
-            appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
-        }
         calcRealProgress();
-        rewriteLine($"[P{phase}] Work on table {table} | {realProgress:F2}%", ConsoleColor.Gray);
+
+        switch (phase)
+        {
+            case "1":
+                if (table == "1")
+                {
+                    rewriteLine($"[P{phase}] Table {table}. | {realProgress:F2}%", ConsoleColor.Gray);
+                }
+                else if (table == "2")
+                {
+                    appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
+                }
+                break;
+            case "2":
+                if (table != "7")
+                {
+                    appendLine($" took {tableSw.Elapsed.TotalMinutes:N} min");
+                }
+                rewriteLine($"[P{phase}] Work on table {table} | {realProgress:F2}%", ConsoleColor.Gray);
+                break;
+        }
+
         tableSw.Restart();
         return;
     }
@@ -289,7 +300,7 @@ void FilterOutput(string? output)
     var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
     if (qs != null)
     {
-        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Yellow);
+        writeLine($"[P{phase}] Warning: need more RAM: {qs}", ConsoleColor.Red);
         return;
     }
     var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
@@ -298,6 +309,7 @@ void FilterOutput(string? output)
         isDash = true;
         bucket++;
         var tableStr = phase != "4" ? $" Table {table}" : string.Empty;
+        calcRealProgress();
         rewriteLine($"[P{phase}]{tableStr}. Bucket: {b} | {realProgress:F2}%", ConsoleColor.Gray);
     }
 }
