@@ -24,8 +24,9 @@ internal class Helper
         return File.Exists(app) ? app : string.Empty;
     }
 
-    public static string? GetRegexMatch(string pattern, string input)
+    public static bool GetRegexMatch(string pattern, string input, out string? res)
     {
-        return new Regex(pattern).Matches(input).FirstOrDefault()?.Groups["res"].Value;
+        res = new Regex(pattern).Matches(input).FirstOrDefault()?.Groups["res"].Value;
+        return res != null;
     }
 }

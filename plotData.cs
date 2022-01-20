@@ -21,11 +21,11 @@ public class PlotData
         set {
             _phase = value;
             _bucket = 0;
+            OnPropertyChanged(nameof(Phase));
             if (value == 1)
             {
                 plotSw.Restart();
             }
-            OnPropertyChanged(nameof(Phase));
         }
     }
 
@@ -81,9 +81,9 @@ public class PlotData
         set
         {
             _table = value;
-            _bucket = 0;
-            tableSw.Restart();
+            _bucket = 0;            
             OnPropertyChanged(nameof(Table));
+            tableSw.Restart();
         }
     }
 

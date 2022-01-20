@@ -157,9 +157,6 @@ async Task KeyPresses()
                         titleFormat = 0;
                     }
                     break;
-                case ConsoleKey.H:
-                    rewriteLine("H presed");
-                    break;
                 case ConsoleKey.Q:
                     rewriteLine("For exit press Ctrl-C or close dialog");
                     break;
@@ -272,39 +269,32 @@ void FilterOutput(string? output)
         // ignored
     }
 
-    var _phase = Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output);
-    if (_phase != null)
+    if (Helper.GetRegexMatch(@"Starting phase (?<res>\d)\/\d:", output, out string? _phase))
     {
-        data.Phase = int.TryParse(_phase, out result) ? result : 0;        
-        return;
+        data.Phase = int.TryParse(_phase, out result) ? result : 0;
     }
-    var _table = Helper.GetRegexMatch(@"", output);
-    _table = Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output);
-    if (_table != null)
+    else if (Helper.GetRegexMatch(@"^Comp\w+ing tables? (?<res>.*)|^Backpropagating on table (?<res>\d+)", output, out string? _table))
     {
         data.Table = _table;
-        return;
     }
-    var _tableTime = Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output);
-    if (_tableTime != null)
+    else if (Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output, out string? _tableTime))
     {
         data.TableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
-        return;
     }
-    var _phaseTime = Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output);
-    if (_phaseTime != null)
+    else if (Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output, out string? _phaseTime))
     {
         data.PhaseTime = TimeSpan.FromSeconds(double.Parse(_phaseTime));
-        return;
     }
-    var qs = Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output);
-    if (qs != null)
+    else if (Helper.GetRegexMatch(@"(?<res>Bucket \d+ QS.*) force_qs: 0", output, out string? qs))
     {
         writeLine($"[P{data.Phase}] Warning: need more RAM: {qs}", ConsoleColor.Red);
-        return;
     }
-    var b = Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output);
-    if (b != null)
+    else if (Helper.GetRegexMatch(@"^ID: (?<res>.*)", output, out string? id))
+    {
+        writeLine(new string('_', 50), ConsoleColor.White);
+        writeLine($"{id}", ConsoleColor.White);
+    }
+    else if (Helper.GetRegexMatch(@"Bucket (?<res>\d+)", output, out string? b))
     {
         data.Bucket++;
     }
@@ -325,9 +315,9 @@ void OnProcessExit(object? sender, EventArgs? e)
 void OnConsoleExit(object? sender, ConsoleCancelEventArgs? e)
 {
     writeLine("Canceling...", ConsoleColor.Yellow);
-    if (process != null)
+    if (process != null && !process.HasExited)
     {
-        Console.WriteLine("---------------------------------------------");
+        Console.WriteLine(new string('_', 50));
         Console.WriteLine($"Kill process {process.ProcessName}? (Y/n)");
         var q = Console.ReadLine();
         if (q.ToLowerInvariant().FirstOrDefault() == 'y')
