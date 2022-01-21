@@ -64,7 +64,7 @@ void OnProperyChanged(object? sender, PropertyChangedEventArgs e)
                             rewriteLine($"[P{data.Phase}] Table {data.Table}. | {data.RealProgress:F2}%", ConsoleColor.Gray);
                             break;
                         case "2":
-                            appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min");
+                            appendLine($" took {data.TableTime.TotalMinutes:N} min");
                             break;
                     }
                     break;
@@ -72,7 +72,7 @@ void OnProperyChanged(object? sender, PropertyChangedEventArgs e)
                     switch (data.Table)
                     {
                         case "7": break;
-                        default: appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min"); break;
+                        default: appendLine($" took {data.TableTime.TotalMinutes:N} min"); break;
                     }
                     rewriteLine($"[P{data.Phase}] Work on table {data.Table} | {data.RealProgress:F2}%", ConsoleColor.Gray);
                     break;
@@ -83,7 +83,7 @@ void OnProperyChanged(object? sender, PropertyChangedEventArgs e)
             switch (data.Phase)
             {
                 case 2:
-                    appendLine($" took {data.tableSw.Elapsed.TotalMinutes:N} min");
+                    appendLine($" took {data.TableTime.TotalMinutes:N} min");
                     break;
                 case 4:
                     Console.WriteLine();
@@ -91,8 +91,8 @@ void OnProperyChanged(object? sender, PropertyChangedEventArgs e)
             }
             writeLine($"Phase {data.Phase} took {data.PhaseTime.TotalMinutes:N} minutes");
             break;
-        case nameof(PlotData.TableTime):
-            appendLine($" took {data.TableTime.TotalMinutes:N} min");
+        case nameof(PlotData.TableTimeLog):
+            appendLine($" took {data.TableTimeLog.TotalMinutes:N} min");
             break;
     }
 }
@@ -279,7 +279,7 @@ void FilterOutput(string? output)
     }
     else if (Helper.GetRegexMatch(@"table time: (?<res>\d*.\d+) seconds", output, out string? _tableTime))
     {
-        data.TableTime = TimeSpan.FromSeconds(double.Parse(_tableTime));
+        data.TableTimeLog = TimeSpan.FromSeconds(double.Parse(_tableTime));
     }
     else if (Helper.GetRegexMatch(@"Time for phase \d = (?<res>\d+\.\d+) sec", output, out string? _phaseTime))
     {
@@ -308,7 +308,7 @@ void OutputDataReceived(object? sender, DataReceivedEventArgs? e)
 void OnProcessExit(object? sender, EventArgs? e)
 {
     writeLine("Plotter has ended.", ConsoleColor.Yellow);
-    writeLine($"Plot time: {data.plotSw.Elapsed.TotalHours:N} hours");
+    writeLine($"Plot time: {data.PlotTime.TotalHours:N} hours");
     Environment.Exit(0);
 }
 
@@ -326,7 +326,7 @@ void OnConsoleExit(object? sender, ConsoleCancelEventArgs? e)
             process.Kill();
         }
     }
-    writeLine($"Plot time: {data.plotSw.Elapsed.TotalHours:N} hours");
+    writeLine($"Plot time: {data.PlotTime.TotalHours:N} hours");
     Environment.Exit(0);
 }
 

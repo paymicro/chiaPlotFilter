@@ -8,8 +8,12 @@ public class PlotData
     int _bucket = 0;
     TimeSpan _phaseTime = TimeSpan.Zero;
     TimeSpan _tableTime = TimeSpan.Zero;
-    public Stopwatch tableSw = new();
-    public Stopwatch plotSw = new();
+    readonly Stopwatch _tableSw = new();
+    readonly Stopwatch _plotSw = new();
+
+    public TimeSpan TableTime { get; private set; } = TimeSpan.Zero;
+    public TimeSpan PlotTime { get; private set; } = TimeSpan.Zero;
+
     public int TotalBuckets { get; set; }
 
     public int Phase
@@ -18,13 +22,16 @@ public class PlotData
         {
             return _phase;
         }
-        set {
+        set
+        {
             _phase = value;
             _bucket = 0;
+
             OnPropertyChanged(nameof(Phase));
             if (value == 1)
             {
-                plotSw.Restart();
+                PlotTime = _plotSw.Elapsed;
+                _plotSw.Restart();
             }
         }
     }
@@ -81,9 +88,10 @@ public class PlotData
         set
         {
             _table = value;
-            _bucket = 0;            
-            OnPropertyChanged(nameof(Table));
-            tableSw.Restart();
+            _bucket = 0;
+            TableTime = _tableSw.Elapsed;
+            _tableSw.Restart();
+            OnPropertyChanged(nameof(Table));            
         }
     }
 
@@ -100,7 +108,8 @@ public class PlotData
         }
     }
 
-    public TimeSpan PhaseTime {
+    public TimeSpan PhaseTime
+    {
         get
         {
             return _phaseTime;
@@ -112,7 +121,7 @@ public class PlotData
         }
     }
 
-    public TimeSpan TableTime
+    public TimeSpan TableTimeLog
     {
         get
         {
@@ -121,33 +130,33 @@ public class PlotData
         set
         {
             _tableTime = value;
-            OnPropertyChanged(nameof(TableTime));
+            OnPropertyChanged(nameof(TableTimeLog));
         }
     }
 
     public string GetElapsed()
     {
-        var elapsed = $"{plotSw.Elapsed.Hours}h {plotSw.Elapsed.Minutes}m";
-        if (plotSw.Elapsed.Days > 0)
+        var elapsed = $"{_plotSw.Elapsed.Hours}h {_plotSw.Elapsed.Minutes}m";
+        if (_plotSw.Elapsed.Days > 0)
         {
-            elapsed = $"{plotSw.Elapsed.Days}d {elapsed}";
+            elapsed = $"{_plotSw.Elapsed.Days}d {elapsed}";
         }
         return $"elapsed {elapsed}";
     }
 
     public string GetTotal()
     {
-        return RealProgress > 5 ? $"total {(plotSw.Elapsed * 100 / RealProgress).TotalHours:F2}h" : "";
+        return RealProgress > 5 ? $"total {(_plotSw.Elapsed * 100 / RealProgress).TotalHours:F2}h" : "";
     }
 
     public string GetETA()
     {
-        return RealProgress > 5 ? $"ETA {DateTime.Now + plotSw.Elapsed * 100 / RealProgress - plotSw.Elapsed:g}h" : "";
+        return RealProgress > 5 ? $"ETA {DateTime.Now + _plotSw.Elapsed * 100 / RealProgress - _plotSw.Elapsed:g}h" : "";
     }
 
     public string GetRemain()
     {
-        return RealProgress > 5 ? $"remain {(plotSw.Elapsed * 100 / RealProgress - plotSw.Elapsed).TotalHours:F2}h" : "";
+        return RealProgress > 5 ? $"remain {(_plotSw.Elapsed * 100 / RealProgress - _plotSw.Elapsed).TotalHours:F2}h" : "";
     }
 
     double GetProgress(double from, double to)
