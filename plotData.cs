@@ -32,6 +32,7 @@ public class PlotData
             {
                 PlotTime = _plotSw.Elapsed;
                 _plotSw.Restart();
+                _tableSw.Restart();
             }
         }
     }
