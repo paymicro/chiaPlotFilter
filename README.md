@@ -18,6 +18,7 @@ For forks use additional `-fork` argument
 # KeyPresses
 
 - `U` - change title
+- `L` - open original log file
 
 # Screenshot
 
