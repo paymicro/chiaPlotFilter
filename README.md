@@ -14,3 +14,11 @@ For forks use additional `-fork` argument
 ```
 -fork chives
 ```
+
+# KeyPresses
+
+- `U` - change title
+
+# Screenshot
+
+![image](https://user-images.githubusercontent.com/27482193/153233409-5ce4067d-cf57-464b-9df4-ea5b4b0395ae.png)
